@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LSAT Progress Tracker</title>
+<style>
+body{font-family:Arial, sans-serif; margin:20px; background:#f8f9fa; color:#333;}
+table{width:100%; border-collapse:collapse; margin-top:20px;}
+th,td{border:1px solid #ddd; padding:8px; text-align:center;}
+th{background-color:#e9ecef;}
+input[type="number"],input[type="text"]{width:90%; padding:4px; box-sizing:border-box;}
+.progress{height:10px; background:#e9ecef; border-radius:5px; width:100%; margin-top:4px;}
+.bar{height:100%; background:#007bff; border-radius:5px; width:0%;}
+.control{margin-top:20px;}
+</style>
+</head>
+<body>
+<h1>LSAT Progress Tracker</h1>
+<table id="tracker">
+<thead>
+<tr>
+<th>Week</th>
+<th>Date Range</th>
+<th>LR Score (out of 25)</th>
+<th>RC % Correct</th>
+<th>Notes</th>
+<th>Progress</th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+<div class="control">
+<button id="export">Export Data</button>
+<input type="file" id="import" accept=".json">
+</div>
+<script>
+const weeks = [
+{label:'Week 1',range:'Aug 12 – Aug 18',lrTarget:13,rcTarget:0.60},
+{label:'Week 2',range:'Aug 19 – Aug 25',lrTarget:15,rcTarget:0.65},
+{label:'Week 3',range:'Aug 26 – Sep 1',lrTarget:17,rcTarget:0.70},
+{label:'Week 4',range:'Sep 2 – Sep 8',lrTarget:18,rcTarget:0.72},
+{label:'Week 5',range:'Sep 9 – Sep 15',lrTarget:19,rcTarget:0.75},
+{label:'Week 6',range:'Sep 16 – Sep 22',lrTarget:20,rcTarget:0.78},
+{label:'Week 7',range:'Sep 23 – Sep 29',lrTarget:21,rcTarget:0.80},
+{label:'Week 8',range:'Sep 30 – Oct 6',lrTarget:22,rcTarget:0.80}
+];
+
+function createTable(){
+const tbody=document.querySelector('#tracker tbody');
+tbody.innerHTML='';
+weeks.forEach((wk,i)=>{
+const tr=document.createElement('tr');
+tr.innerHTML=`
+<td>${wk.label}</td>
+<td>${wk.range}</td>
+<td><input type="number" min="0" max="25" step="1" data-week-index="${i}" data-type="lr"></td>
+<td><input type="number" min="0" max="1" step="0.01" data-week-index="${i}" data-type="rc"></td>
+<td><input type="text" data-week-index="${i}" data-type="notes"></td>
+<td><div class="progress"><div class="bar"></div></div></td>
+`;
+tbody.appendChild(tr);
+});
+}
+
+function loadData(){
+const data=JSON.parse(localStorage.getItem('lsatProgress')||'{}');
+weeks.forEach((wk,i)=>{
+const lr=data['lr'+i];
+const rc=data['rc'+i];
+const notes=data['notes'+i];
+const inputs=document.querySelectorAll('input[data-week-index="'+i+'"]');
+inputs.forEach(input=>{
+if(input.getAttribute('data-type')==='lr' && lr!==undefined){
+input.value=lr;
+}
+if(input.getAttribute('data-type')==='rc' && rc!==undefined){
+input.value=rc;
+}
+if(input.getAttribute('data-type')==='notes' && notes!==undefined){
+input.value=notes;
+}
+});
+updateProgressRow(i);
+});
+}
+
+function saveData(){
+const data={};
+weeks.forEach((wk,i)=>{
+const lrVal=parseFloat(document.querySelector('input[data-week-index="'+i+'"][data-type="lr"]').value);
+const rcVal=parseFloat(document.querySelector('input[data-week-index="'+i+'"][data-type="rc"]').value);
+const notes=document.querySelector('input[data-week-index="'+i+'"][data-type="notes"]').value;
+if(!isNaN(lrVal)) data['lr'+i]=lrVal;
+if(!isNaN(rcVal)) data['rc'+i]=rcVal;
+if(notes) data['notes'+i]=notes;
+});
+localStorage.setItem('lsatProgress',JSON.stringify(data));
+weeks.forEach((wk,i)=>updateProgressRow(i));
+}
+
+function updateProgressRow(i){
+const lrInput=document.querySelector('input[data-week-index="'+i+'"][data-type="lr"]');
+const rcInput=document.querySelector('input[data-week-index="'+i+'"][data-type="rc"]');
+const lrVal=parseFloat(lrInput.value);
+const rcVal=parseFloat(rcInput.value);
+const wk=weeks[i];
+let lrProg=0;
+let rcProg=0;
+if(!isNaN(lrVal)){lrProg=Math.min(lrVal/wk.lrTarget,1);}
+if(!isNaN(rcVal)){rcProg=Math.min(rcVal/wk.rcTarget,1);}
+const progress=(lrProg+rcProg)/2;
+const bar=document.querySelectorAll('.progress .bar')[i];
+bar.style.width=(progress*100).toFixed(0)+'%';
+}
+
+function exportData(){
+const data=localStorage.getItem('lsatProgress')||'{}';
+const blob=new Blob([data],{type:'application/json'});
+const url=URL.createObjectURL(blob);
+const a=document.createElement('a');
+a.href=url;
+a.download='lsat-progress.json';
+document.body.appendChild(a);
+a.click();
+document.body.removeChild(a);
+URL.revokeObjectURL(url);
+}
+
+function importData(file){
+const reader=new FileReader();
+reader.onload=function(e){
+try{
+const importedData=JSON.parse(e.target.result);
+localStorage.setItem('lsatProgress',JSON.stringify(importedData));
+loadData();
+}catch(err){
+alert('Invalid JSON file.');
+}
+};
+reader.readAsText(file);
+}
+
+createTable();
+loadData();
+
+document.querySelector('#tracker').addEventListener('input', function(e){
+if(e.target.tagName.toLowerCase()==='input'){
+saveData();
+}
+});
+document.getElementById('export').addEventListener('click', exportData);
+document.getElementById('import').addEventListener('change', function(e){
+if(e.target.files.length>0){
+importData(e.target.files[0]);
+}
+});
+</script>
+</body>
+</html>
